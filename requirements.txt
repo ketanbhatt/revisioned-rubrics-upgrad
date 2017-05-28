@@ -1,6 +1,10 @@
 appdirs==1.4.3
 Django==1.11.1
+factory-boy==2.8.1
+Faker==0.7.12
+ipaddress==1.0.18
 packaging==16.8
 pyparsing==2.2.0
+python-dateutil==2.6.0
 pytz==2017.2
 six==1.10.0
