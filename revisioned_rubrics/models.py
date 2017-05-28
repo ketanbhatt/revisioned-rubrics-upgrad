@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from bulk_update.helper import bulk_update
-from django.db.models import Q
+from django.db.models import Q, Avg, Count, Case, When
 
 from revisioned_rubrics.constants import RUBRIC_DEFAULT_MAX_MARKS, DEFAULT_INDEX_FOR_MARKS
 
@@ -173,6 +173,41 @@ class Attempt(CreateUpdateAbstractModel):
         return serialised_rubrics, serialised_edges
 
 
+class MarksRubricAttemptQuerySet(models.QuerySet):
+    def get_avg_marks(self, rubric_id, revision_id):
+        """
+        Returns Average marks for the given Rubric and Revision.
+        """
+        return MarksRubricAttempt.objects.filter(
+            rubric_id=rubric_id, revision_id=revision_id
+        ).values('marks').aggregate(Avg('marks'))['marks__avg']
+
+    def get_percentile_rank_for_student(self, student_id, rubric_id, revision_id):
+        """
+        Returns Percentile rank of the student for the given Rubric and Revision.
+        Formulae used for Percentile Rank taken from: https://www.easycalculation.com/statistics/percentile-rank.php
+        """
+        student_score = MarksRubricAttempt.objects.filter(
+            attempt__student_id=student_id, rubric_id=rubric_id, revision_id=revision_id
+        ).values_list('marks', flat=True)[:1][0]
+
+        counts = MarksRubricAttempt.objects.filter(
+            rubric_id=rubric_id, revision_id=revision_id
+        ).aggregate(
+            total_count=Count('id'),
+            below_count=Count(Case(When(marks__lt=student_score, then=1), default=None)),
+            same_count=Count(Case(When(marks=student_score, then=1), default=None))
+        )
+        below_count = counts['below_count']
+        # Minus 1 for removing Student's own count
+        same_count, total_count = counts['same_count'] - 1, counts['total_count'] - 1
+
+        if total_count == 0:
+            return None
+        else:
+            return (below_count + (0.5 * same_count))/total_count
+
+
 class MarksRubricAttempt(CreateUpdateAbstractModel):
     """
     Tracks marks given for each rubric of a question for each attempt.
@@ -182,6 +217,8 @@ class MarksRubricAttempt(CreateUpdateAbstractModel):
     rubric = models.ForeignKey(Rubric)
     marks = models.PositiveSmallIntegerField()
     revision = models.ForeignKey(GradingRevision)
+
+    objects = MarksRubricAttemptQuerySet.as_manager()
 
     @classmethod
     def get_marks_for_revision(cls, attempt_id, revision_id):

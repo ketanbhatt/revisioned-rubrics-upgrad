@@ -1,5 +1,6 @@
 appdirs==1.4.3
 Django==1.11.1
+django-bulk-update==2.1.0
 factory-boy==2.8.1
 Faker==0.7.12
 ipaddress==1.0.18

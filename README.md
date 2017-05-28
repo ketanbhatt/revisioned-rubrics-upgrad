@@ -5,7 +5,29 @@
 - [x] Implement all models
 - [x] Implement CSV importing (handle versioning)
 - [x] Create API for getting Student and Question's Rubric details
-- [ ] Implement method for getting stats like average marks for rubric etc
+- [x] Implement method for getting stats like average marks for rubric etc
+
+
+## Setup Demo:
+1. `pip install requirements.txt -r`
+2. `python manage.py migrate`
+3. `python manage.py createsuperuser` --> To access admin
+4. `python manage.py runserver`
+5. Go to the admin and create a `Grading Revision`
+6. `python manage.py seed_db` --> For creating dummy question, rubrics, and attempt
+
+### CSV imports
+1. Use `python manage.py import_grade_sheet <CSV_FILE_NAME> --revision <REVISION_ID> --attempt <ATTEMPT_ID` to import 
+CSV in the decided format. 
+2. Check Admin for necessary Updates
+
+### Student API
+1. Hit `http://localhost:8000/rubrics/student-performance/<student_id>?question=<question_id>&revision=<revision_id>` 
+to get the required JSON response
+
+### Other Analytics
+1. Check out `MarksRubricAttemptQuerySet.get_avg_marks` for Average
+2. Check out `MarksRubricAttemptQuerySet.get_percentile_rank_for_student` for percentile rank
 
 
 ## Assumptions and Future improvements
