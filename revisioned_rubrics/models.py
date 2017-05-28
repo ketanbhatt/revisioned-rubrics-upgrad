@@ -27,7 +27,9 @@ class RubricTree(CreateUpdateAbstractModel):
     """
     Rubric Tree that connects a Question to its rubrics'
     """
-    pass
+
+    def __str__(self):
+        return "RubricTree: {0}".format(self.id)
 
 
 class Rubric(CreateUpdateAbstractModel):
@@ -96,17 +98,27 @@ class Attempt(CreateUpdateAbstractModel):
 
     @classmethod
     def import_grade_sheet(cls, grading_sheet_name, attempt_id, revision_id):
+        """
+        Imports the grade sheet with the given name.
+        
+        If the marks for the current revision are not present, they are created.
+        If they are present, the marks are updated with the new marks.
+        """
+        assert Attempt.objects.filter(id=attempt_id).exists(), "Attempt ID: {0} does not exist".format(attempt_id)
+        assert GradingRevision.objects.filter(id=revision_id).exists(), \
+            "Revision ID: {0} does not exist".format(revision_id)
+
         with open(grading_sheet_name, 'rb') as f:
             grade_sheet = csv.reader(f)
 
             # Remove headers from the sheet
             grade_sheet.next()
 
-            marks_for_revision = MarksRubricAttempt.get_marks_for_revision(attempt_id, revision_id)
+            marks_for_revision = AttemptEvaluation.get_marks_for_revision(attempt_id, revision_id)
             if marks_for_revision:
-                MarksRubricAttempt.update_marks_for_revision(marks_for_revision, grade_sheet)
+                AttemptEvaluation.update_marks_for_revision(marks_for_revision, grade_sheet)
             else:
-                MarksRubricAttempt.store_marks_for_revision(attempt_id, revision_id, grade_sheet)
+                AttemptEvaluation.store_marks_for_revision(attempt_id, revision_id, grade_sheet)
 
     @classmethod
     def get_serialised_rubric_tree_for_student_question_revision(cls, student_id, question_id, revision_id):
@@ -142,7 +154,7 @@ class Attempt(CreateUpdateAbstractModel):
                 "destination": 3
             }]
         """
-        marks_for_attempt = MarksRubricAttempt.objects.filter(
+        marks_for_attempt = AttemptEvaluation.objects.filter(
             attempt__student_id=student_id, attempt__question_id=question_id, revision_id=revision_id
         ).select_related('rubric').only(
             'id', 'rubric_id', 'marks', 'rubric__name', 'rubric__max_marks', 'rubric__is_leaf'
@@ -178,7 +190,7 @@ class MarksRubricAttemptQuerySet(models.QuerySet):
         """
         Returns Average marks for the given Rubric and Revision.
         """
-        return MarksRubricAttempt.objects.filter(
+        return AttemptEvaluation.objects.filter(
             rubric_id=rubric_id, revision_id=revision_id
         ).values('marks').aggregate(Avg('marks'))['marks__avg']
 
@@ -187,11 +199,11 @@ class MarksRubricAttemptQuerySet(models.QuerySet):
         Returns Percentile rank of the student for the given Rubric and Revision.
         Formulae used for Percentile Rank taken from: https://www.easycalculation.com/statistics/percentile-rank.php
         """
-        student_score = MarksRubricAttempt.objects.filter(
+        student_score = AttemptEvaluation.objects.filter(
             attempt__student_id=student_id, rubric_id=rubric_id, revision_id=revision_id
         ).values_list('marks', flat=True)[:1][0]
 
-        counts = MarksRubricAttempt.objects.filter(
+        counts = AttemptEvaluation.objects.filter(
             rubric_id=rubric_id, revision_id=revision_id
         ).aggregate(
             total_count=Count('id'),
@@ -208,7 +220,7 @@ class MarksRubricAttemptQuerySet(models.QuerySet):
             return (below_count + (0.5 * same_count))/total_count
 
 
-class MarksRubricAttempt(CreateUpdateAbstractModel):
+class AttemptEvaluation(CreateUpdateAbstractModel):
     """
     Tracks marks given for each rubric of a question for each attempt.
     Also handles revision of marks.
@@ -223,14 +235,14 @@ class MarksRubricAttempt(CreateUpdateAbstractModel):
     @classmethod
     def get_marks_for_revision(cls, attempt_id, revision_id):
         """
-        Returns MarksRubricAttempt objects for the given attempt and revision
+        Returns AttemptEvaluation objects for the given attempt and revision
         """
         return cls.objects.filter(attempt_id=attempt_id, revision_id=revision_id)
 
     @classmethod
     def update_marks_for_revision(cls, marks_rubric_attempt_objs, updated_grades):
         """
-        Updates marks for the given MarksRubricAttempt objects according to the specified marks
+        Updates marks for the given AttemptEvaluation objects according to the specified marks
         """
         rubric_to_marks_map = {
             marks_obj.rubric_id: marks_obj for marks_obj in marks_rubric_attempt_objs
@@ -269,7 +281,7 @@ class MarksRubricAttempt(CreateUpdateAbstractModel):
     @classmethod
     def store_marks_for_revision(cls, attempt_id, revision_id, new_grades):
         """
-        Creates MarksRubricAttempt objects for the given attempt and revision, according to the specified marks
+        Creates AttemptEvaluation objects for the given attempt and revision, according to the specified marks
         """
         rubric_to_marks_map = {}
 
@@ -278,7 +290,7 @@ class MarksRubricAttempt(CreateUpdateAbstractModel):
             try:
                 marks_obj = rubric_to_marks_map[rubric]
             except KeyError:
-                rubric_to_marks_map[rubric] = MarksRubricAttempt(
+                rubric_to_marks_map[rubric] = AttemptEvaluation(
                     attempt_id=attempt_id, revision_id=revision_id, rubric_id=rubric_id, marks=rubric_marks
                 )
             else:

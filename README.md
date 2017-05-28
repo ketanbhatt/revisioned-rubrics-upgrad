@@ -26,8 +26,8 @@ CSV in the decided format.
 to get the required JSON response
 
 ### Other Analytics
-1. Check out `MarksRubricAttemptQuerySet.get_avg_marks` for Average
-2. Check out `MarksRubricAttemptQuerySet.get_percentile_rank_for_student` for percentile rank
+1. Check out `AttemptEvaluation.get_avg_marks` for Average
+2. Check out `AttemptEvaluation.get_percentile_rank_for_student` for percentile rank
 
 
 ## Assumptions and Future improvements
