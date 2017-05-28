@@ -4,7 +4,7 @@
 - [x] Design for Import for grades
 - [x] Implement all models
 - [x] Implement CSV importing (handle versioning)
-- [ ] Create API for getting Student and Question's Rubric details
+- [x] Create API for getting Student and Question's Rubric details
 - [ ] Implement method for getting stats like average marks for rubric etc
 
 
@@ -17,3 +17,5 @@
 - When a new revision is added for an attempt, import sheet contains all the marks, even those that were not updated
 - The import sheet will contain IDs of the rubrics (assuming that they are coming from our own frontend client). Can be 
 easily modified to take names
+- Validation for things like finding cycles in the Rubric Tree
+- Validation for Maximum Marks

@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from bulk_update.helper import bulk_update
-
+from django.db.models import Q
 
 from revisioned_rubrics.constants import RUBRIC_DEFAULT_MAX_MARKS, DEFAULT_INDEX_FOR_MARKS
 
@@ -107,6 +107,70 @@ class Attempt(CreateUpdateAbstractModel):
                 MarksRubricAttempt.update_marks_for_revision(marks_for_revision, grade_sheet)
             else:
                 MarksRubricAttempt.store_marks_for_revision(attempt_id, revision_id, grade_sheet)
+
+    @classmethod
+    def get_serialised_rubric_tree_for_student_question_revision(cls, student_id, question_id, revision_id):
+        """
+        Returns Serialised Rubrics and Edges in the format:
+        1. Rubrics:
+            [{
+                "max_marks": 10,
+                "marks": 10,
+                "rubric_id": 1,
+                "id": 1,
+                "name": "A"
+            }, {
+                "max_marks": 10,
+                "marks": 10,
+                "rubric_id": 2,
+                "id": 2,
+                "name": "B"
+            }, {
+                "max_marks": 10,
+                "marks": 10,
+                "rubric_id": 3,
+                "id": 3,
+                "name": "C"
+            }]
+        
+        2. Edges:
+            [{
+                "source": 1,
+                "destination": 2
+            }, {
+                "source": 2,
+                "destination": 3
+            }]
+        """
+        marks_for_attempt = MarksRubricAttempt.objects.filter(
+            attempt__student_id=student_id, attempt__question_id=question_id, revision_id=revision_id
+        ).select_related('rubric').only(
+            'id', 'rubric_id', 'marks', 'rubric__name', 'rubric__max_marks', 'rubric__is_leaf'
+        )
+
+        rubric_ids = [marks_obj.rubric_id for marks_obj in marks_for_attempt]
+        rubric_edges = RubricEdge.objects.filter(
+            Q(src_rubric_id__in=rubric_ids) | Q(dest_rubric_id__in=rubric_ids)
+        )
+
+        serialised_rubrics = [
+            {
+                'id': marks_obj.id,
+                'rubric_id': marks_obj.rubric_id,
+                'name': marks_obj.rubric.name,
+                'marks': marks_obj.marks,
+                'max_marks': marks_obj.rubric.max_marks
+            } for marks_obj in marks_for_attempt
+        ]
+
+        serialised_edges = [
+            {
+                'source': edge.src_rubric_id,
+                'destination': edge.dest_rubric_id,
+            } for edge in rubric_edges
+        ]
+
+        return serialised_rubrics, serialised_edges
 
 
 class MarksRubricAttempt(CreateUpdateAbstractModel):
